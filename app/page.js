@@ -4,7 +4,7 @@ import { useState } from "react";
 
 export default function Home() {
   const [description, setDescription] = useState("");
-  const [status, setStatus] = useState("idle"); // idle | loading | done | error
+  const [status, setStatus] = useState("idle");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
@@ -94,6 +94,11 @@ export default function Home() {
             </a>
           </p>
           <p>Firestore 데이터 경로: {result.firestorePath}</p>
+          {result.debug && (
+            <p style={{ color: "#888", fontSize: 13 }}>
+              [진단] stopReason: {String(result.debug.stopReason)} / outputTokens: {String(result.debug.outputTokens)} / htmlLength: {String(result.debug.htmlLength)}
+            </p>
+          )}
         </div>
       )}
     </main>
