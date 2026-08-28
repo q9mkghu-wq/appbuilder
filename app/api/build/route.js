@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
 import { generateStaticApp } from "../../../lib/generate";
 import { createRepo, pushFile } from "../../../lib/github";
-import { createVercelProject } from "../../../lib/vercel";
+import { createVercelProject, triggerDeployment } from "../../../lib/vercel";
 import { createAppSpace } from "../../../lib/firebase";
 
-// 생성된 앱이 브라우저에서 Firestore에 접근할 때 쓰는 "클라이언트" 설정.
-// Admin SDK 키와 달리 이 값들은 공개되어도 안전하도록 설계되어 있으며
-// (Firebase 콘솔 > 프로젝트 설정 > 일반 > 내 앱에서 확인 가능),
-// 실제 접근 제어는 Firestore 보안 규칙에서 처리합니다.
 const firebaseClientConfig = {
   apiKey: process.env.FIREBASE_CLIENT_API_KEY,
   authDomain: process.env.FIREBASE_CLIENT_AUTH_DOMAIN,
@@ -38,19 +34,20 @@ export async function POST(request) {
   const repoName = `app-${slugify(description)}-${Date.now().toString(36)}`;
 
   try {
-    // 1. Firebase에 이 앱 전용 공간(컬렉션) 생성
     const collectionPath = await createAppSpace(repoName, description);
 
-    // 2. AI로 코드 생성 (Firebase 연결 코드까지 포함해서 생성)
     const html = await generateStaticApp(description, {
       firebaseConfig: firebaseClientConfig,
       collectionPath,
     });
 
-    // 3. GitHub 레포 생성
     const repo = await createRepo(repoName);
 
-    // 4. 생성된 코드를 레포에 푸시
+    const vercelProject = await createVercelProject(
+      repoName,
+      repo.full_name
+    );
+
     await pushFile(
       repo.owner.login,
       repo.name,
@@ -59,19 +56,12 @@ export async function POST(request) {
       "feat: AI가 생성한 초기 앱 코드 (Firebase 연동 포함)"
     );
 
-    // 5. Vercel 프로젝트 생성 (GitHub 레포와 연결 -> 자동 배포 트리거)
-    const vercelProject = await createVercelProject(
-      repoName,
-      repo.full_name
-    );
+    await triggerDeployment(vercelProject.id, repoName, repo.id, "main");
 
     return NextResponse.json({
       repoUrl: repo.html_url,
       vercelProjectName: vercelProject.name,
       firestorePath: collectionPath,
-      // Vercel의 기본 배포 도메인 패턴 (프로젝트명.vercel.app). 최초 빌드는
-      // 완료까지 몇 십 초 정도 걸리므로, 실제 서비스에서는 상태를 폴링해서
-      // 빌드 완료 후 안내하는 것을 권장합니다.
       previewUrl: `https://${vercelProject.name}.vercel.app`,
     });
   } catch (err) {
