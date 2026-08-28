@@ -36,7 +36,7 @@ export async function POST(request) {
   try {
     const collectionPath = await createAppSpace(repoName, description);
 
-    const html = await generateStaticApp(description, {
+    const { html, stopReason, outputTokens } = await generateStaticApp(description, {
       firebaseConfig: firebaseClientConfig,
       collectionPath,
     });
@@ -63,6 +63,11 @@ export async function POST(request) {
       vercelProjectName: vercelProject.name,
       firestorePath: collectionPath,
       previewUrl: `https://${vercelProject.name}.vercel.app`,
+      debug: {
+        stopReason,
+        outputTokens,
+        htmlLength: html.length,
+      },
     });
   } catch (err) {
     console.error(err);
