@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // apps/{appId} 문서는 서버(Admin SDK)만 생성/수정 가능 — 클라이언트는 읽기만 허용
+    match /apps/{appId} {
+      allow read: if true;
+      allow write: if false;
+
+      // 각 앱이 실제 데이터를 저장하는 하위 컬렉션.
+      // MVP 단계에서는 누구나 읽고 쓸 수 있게 열어둡니다 (데모/프로토타입용).
+      // 실서비스 전환 시에는 앱별 API 키 검증 등으로 반드시 좁혀야 합니다.
+      match /items/{itemId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}
