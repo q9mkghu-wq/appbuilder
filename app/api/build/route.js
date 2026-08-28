@@ -31,7 +31,10 @@ export async function POST(request) {
     );
   }
 
-  const repoName = `app-${slugify(description)}-${Date.now().toString(36)}`;
+  const slug = slugify(description);
+  const repoName = `app-${slug ? slug + "-" : ""}${Date.now().toString(36)}`
+    .replace(/-+/g, "-")
+    .replace(/(^-|-$)/g, "");
 
   try {
     const collectionPath = await createAppSpace(repoName, description);
@@ -56,13 +59,14 @@ export async function POST(request) {
       "feat: AI가 생성한 초기 앱 코드 (Firebase 연동 포함)"
     );
 
-    await triggerDeployment(vercelProject.id, repoName, repo.id, "main");
+    const deployment = await triggerDeployment(vercelProject.id, repoName, repo.id, "main");
 
     return NextResponse.json({
       repoUrl: repo.html_url,
       vercelProjectName: vercelProject.name,
       firestorePath: collectionPath,
-      previewUrl: `https://${vercelProject.name}.vercel.app`,
+      previewUrl: `https://${deployment.url}`,
+      productionUrl: `https://${vercelProject.name}.vercel.app`,
       debug: {
         stopReason,
         outputTokens,
