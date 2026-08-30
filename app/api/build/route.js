@@ -44,6 +44,13 @@ export async function POST(request) {
       collectionPath,
     });
 
+    if (stopReason === "max_tokens") {
+      throw new Error(
+        `요청하신 앱이 너무 복잡해서 코드가 완성되지 못하고 중간에 잘렸습니다 (생성된 토큰: ${outputTokens}개). ` +
+        `설명을 좀 더 단순하게 줄이거나, 기능을 나눠서 요청해보세요.`
+      );
+    }
+
     const repo = await createRepo(repoName);
 
     const vercelProject = await createVercelProject(
