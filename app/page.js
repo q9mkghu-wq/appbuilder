@@ -4,9 +4,25 @@ import { useState } from "react";
 
 export default function Home() {
   const [description, setDescription] = useState("");
-  const [status, setStatus] = useState("idle");
+  const [image, setImage] = useState(null); // { mediaType, data, previewUrl }
+  const [status, setStatus] = useState("idle"); // idle | loading | done | error
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+
+  function handleImageChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setImage(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const [prefix, data] = reader.result.split(",");
+      const mediaType = prefix.match(/data:(.*);base64/)?.[1] || file.type;
+      setImage({ mediaType, data, previewUrl: reader.result });
+    };
+    reader.readAsDataURL(file);
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -18,7 +34,10 @@ export default function Home() {
       const res = await fetch("/api/build", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description }),
+        body: JSON.stringify({
+          description,
+          image: image ? { mediaType: image.mediaType, data: image.data } : null,
+        }),
       });
       const data = await res.json();
 
@@ -45,7 +64,8 @@ export default function Home() {
       <h1 style={{ fontSize: 24, marginBottom: 8 }}>App Builder MVP</h1>
       <p style={{ color: "#555", marginBottom: 32 }}>
         만들고 싶은 앱을 설명하면, AI가 코드를 생성하고 GitHub에 푸시한 뒤
-        Vercel에 자동으로 배포합니다.
+        Vercel에 자동으로 배포합니다. 참고할 이미지(디자인 시안, 스크린샷 등)를
+        같이 첨부할 수도 있습니다.
       </p>
 
       <form onSubmit={handleSubmit}>
@@ -62,6 +82,26 @@ export default function Home() {
             marginBottom: 12,
           }}
         />
+
+        <label style={{ display: "block", marginBottom: 6, fontSize: 14, color: "#555" }}>
+          참고 이미지 (선택)
+        </label>
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          onChange={handleImageChange}
+          style={{ marginBottom: 12, display: "block" }}
+        />
+        {image && (
+          <div style={{ marginBottom: 12 }}>
+            <img
+              src={image.previewUrl}
+              alt="첨부 이미지 미리보기"
+              style={{ maxWidth: 200, maxHeight: 200, borderRadius: 8, border: "1px solid #ddd" }}
+            />
+          </div>
+        )}
+
         <button
           type="submit"
           disabled={status === "loading"}
@@ -88,11 +128,19 @@ export default function Home() {
             </a>
           </p>
           <p>
-            배포 URL (빌드 완료까지 30초~1분 소요될 수 있습니다):{" "}
+            배포 URL (지금 바로 접속 가능):{" "}
             <a href={result.previewUrl} target="_blank" rel="noreferrer">
               {result.previewUrl}
             </a>
           </p>
+          {result.productionUrl && (
+            <p>
+              정식 도메인 (연결까지 몇 분 걸릴 수 있음):{" "}
+              <a href={result.productionUrl} target="_blank" rel="noreferrer">
+                {result.productionUrl}
+              </a>
+            </p>
+          )}
           <p>Firestore 데이터 경로: {result.firestorePath}</p>
           {result.debug && (
             <p style={{ color: "#888", fontSize: 13 }}>
