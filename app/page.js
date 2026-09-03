@@ -2,26 +2,40 @@
 
 import { useState } from "react";
 
+const MAX_IMAGES = 5;
+
 export default function Home() {
   const [description, setDescription] = useState("");
-  const [image, setImage] = useState(null); // { mediaType, data, previewUrl }
+  const [images, setImages] = useState([]); // [{ mediaType, data, previewUrl }]
   const [status, setStatus] = useState("idle"); // idle | loading | done | error
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
   function handleImageChange(e) {
-    const file = e.target.files?.[0];
-    if (!file) {
-      setImage(null);
+    const files = Array.from(e.target.files || []).slice(0, MAX_IMAGES);
+    if (files.length === 0) {
+      setImages([]);
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const [prefix, data] = reader.result.split(",");
-      const mediaType = prefix.match(/data:(.*);base64/)?.[1] || file.type;
-      setImage({ mediaType, data, previewUrl: reader.result });
-    };
-    reader.readAsDataURL(file);
+
+    Promise.all(
+      files.map(
+        (file) =>
+          new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const [prefix, data] = reader.result.split(",");
+              const mediaType = prefix.match(/data:(.*);base64/)?.[1] || file.type;
+              resolve({ mediaType, data, previewUrl: reader.result });
+            };
+            reader.readAsDataURL(file);
+          })
+      )
+    ).then(setImages);
+  }
+
+  function removeImage(index) {
+    setImages((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(e) {
@@ -36,7 +50,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           description,
-          image: image ? { mediaType: image.mediaType, data: image.data } : null,
+          images: images.map((img) => ({ mediaType: img.mediaType, data: img.data })),
         }),
       });
       const data = await res.json();
@@ -65,7 +79,7 @@ export default function Home() {
       <p style={{ color: "#555", marginBottom: 32 }}>
         만들고 싶은 앱을 설명하면, AI가 코드를 생성하고 GitHub에 푸시한 뒤
         Vercel에 자동으로 배포합니다. 참고할 이미지(디자인 시안, 스크린샷 등)를
-        같이 첨부할 수도 있습니다.
+        최대 {MAX_IMAGES}장까지 같이 첨부할 수도 있습니다.
       </p>
 
       <form onSubmit={handleSubmit}>
@@ -84,21 +98,54 @@ export default function Home() {
         />
 
         <label style={{ display: "block", marginBottom: 6, fontSize: 14, color: "#555" }}>
-          참고 이미지 (선택)
+          참고 이미지 (선택, 최대 {MAX_IMAGES}장)
         </label>
         <input
           type="file"
           accept="image/png,image/jpeg,image/webp,image/gif"
+          multiple
           onChange={handleImageChange}
           style={{ marginBottom: 12, display: "block" }}
         />
-        {image && (
-          <div style={{ marginBottom: 12 }}>
-            <img
-              src={image.previewUrl}
-              alt="첨부 이미지 미리보기"
-              style={{ maxWidth: 200, maxHeight: 200, borderRadius: 8, border: "1px solid #ddd" }}
-            />
+
+        {images.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+            {images.map((img, i) => (
+              <div key={i} style={{ position: "relative" }}>
+                <img
+                  src={img.previewUrl}
+                  alt={`첨부 이미지 ${i + 1} 미리보기`}
+                  style={{
+                    width: 100,
+                    height: 100,
+                    objectFit: "cover",
+                    borderRadius: 8,
+                    border: "1px solid #ddd",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage(i)}
+                  aria-label="이미지 제거"
+                  style={{
+                    position: "absolute",
+                    top: -6,
+                    right: -6,
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    border: "none",
+                    background: "#333",
+                    color: "#fff",
+                    fontSize: 12,
+                    lineHeight: "20px",
+                    cursor: "pointer",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
