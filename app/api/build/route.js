@@ -22,7 +22,7 @@ function slugify(text) {
 }
 
 export async function POST(request) {
-  const { description, image } = await request.json();
+  const { description, images } = await request.json();
 
   if (!description || description.trim().length < 3) {
     return NextResponse.json(
@@ -42,7 +42,7 @@ export async function POST(request) {
     const { html, stopReason, outputTokens } = await generateStaticApp(description, {
       firebaseConfig: firebaseClientConfig,
       collectionPath,
-      image,
+      images,
     });
 
     if (stopReason === "max_tokens") {
