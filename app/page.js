@@ -3,13 +3,49 @@
 import { useState } from "react";
 
 const MAX_IMAGES = 5;
+const MAX_DIMENSION = 1280;
+const JPEG_QUALITY = 0.75;
 
 export default function Home() {
   const [description, setDescription] = useState("");
-  const [images, setImages] = useState([]); // [{ mediaType, data, previewUrl }]
-  const [status, setStatus] = useState("idle"); // idle | loading | done | error
+  const [images, setImages] = useState([]);
+  const [status, setStatus] = useState("idle");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+
+  function resizeAndCompress(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > height && width > MAX_DIMENSION) {
+            height = Math.round((height * MAX_DIMENSION) / width);
+            width = MAX_DIMENSION;
+          } else if (height > MAX_DIMENSION) {
+            width = Math.round((width * MAX_DIMENSION) / height);
+            height = MAX_DIMENSION;
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+          const [, data] = dataUrl.split(",");
+          resolve({ mediaType: "image/jpeg", data, previewUrl: dataUrl });
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
 
   function handleImageChange(e) {
     const files = Array.from(e.target.files || []).slice(0, MAX_IMAGES);
@@ -17,21 +53,7 @@ export default function Home() {
       setImages([]);
       return;
     }
-
-    Promise.all(
-      files.map(
-        (file) =>
-          new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const [prefix, data] = reader.result.split(",");
-              const mediaType = prefix.match(/data:(.*);base64/)?.[1] || file.type;
-              resolve({ mediaType, data, previewUrl: reader.result });
-            };
-            reader.readAsDataURL(file);
-          })
-      )
-    ).then(setImages);
+    Promise.all(files.map(resizeAndCompress)).then(setImages);
   }
 
   function removeImage(index) {
@@ -53,7 +75,18 @@ export default function Home() {
           images: images.map((img) => ({ mediaType: img.mediaType, data: img.data })),
         }),
       });
-      const data = await res.json();
+
+      const rawText = await res.text();
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(
+          res.status === 413 || /entity too large/i.test(rawText)
+            ? "요청 용량이 너무 큽니다. 이미지 개수를 줄이거나 더 작은 이미지로 다시 시도해주세요."
+            : `서버 오류 (status ${res.status}): ${rawText.slice(0, 200)}`
+        );
+      }
 
       if (!res.ok) {
         throw new Error(data.error || "알 수 없는 오류");
@@ -79,7 +112,8 @@ export default function Home() {
       <p style={{ color: "#555", marginBottom: 32 }}>
         만들고 싶은 앱을 설명하면, AI가 코드를 생성하고 GitHub에 푸시한 뒤
         Vercel에 자동으로 배포합니다. 참고할 이미지(디자인 시안, 스크린샷 등)를
-        최대 {MAX_IMAGES}장까지 같이 첨부할 수도 있습니다.
+        최대 {MAX_IMAGES}장까지 같이 첨부할 수도 있습니다 (자동으로 크기가
+        줄어들어 업로드됩니다).
       </p>
 
       <form onSubmit={handleSubmit}>
