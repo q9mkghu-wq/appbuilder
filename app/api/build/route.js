@@ -4,6 +4,8 @@ import { createRepo, pushFile } from "../../../lib/github";
 import { createVercelProject, triggerDeployment } from "../../../lib/vercel";
 import { createAppSpace } from "../../../lib/firebase";
 
+export const maxDuration = 300;
+
 const firebaseClientConfig = {
   apiKey: process.env.FIREBASE_CLIENT_API_KEY,
   authDomain: process.env.FIREBASE_CLIENT_AUTH_DOMAIN,
